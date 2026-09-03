@@ -72,6 +72,26 @@ function changePage(delta) {
   if (target < 0 || target >= pages.length) return;
   currentPage = target;
   renderPage(delta > 0 ? 'next' : 'previous');
+  if (delta > 0) playFairyFlight();
+}
+
+function playFairyFlight() {
+  document.querySelector('.magic-flight')?.remove();
+  const flight = document.createElement('div');
+  flight.className = 'magic-flight';
+  flight.setAttribute('aria-hidden', 'true');
+  flight.innerHTML = '<span class="flying-fairy">🧚</span>';
+  for (let index = 0; index < 14; index += 1) {
+    const sparkle = document.createElement('span');
+    sparkle.className = 'flight-sparkle';
+    sparkle.style.setProperty('--spark-size', `${3 + (index % 4) * 2}px`);
+    sparkle.style.setProperty('--spark-delay', `${index * .035}s`);
+    sparkle.style.setProperty('--spark-x', `${-22 - index * 8}px`);
+    sparkle.style.setProperty('--spark-y', `${(index % 3 - 1) * 15}px`);
+    flight.appendChild(sparkle);
+  }
+  book.appendChild(flight);
+  flight.addEventListener('animationend', () => flight.remove(), { once: true });
 }
 
 function listen() {
