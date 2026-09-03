@@ -28,7 +28,6 @@ const pages = [
 const book = document.getElementById('book');
 const illustrationWrap = document.getElementById('illustrationWrap');
 const storyText = document.getElementById('storyText');
-const chapter = document.getElementById('chapter');
 const pageNumber = document.getElementById('pageNumber');
 const progressBar = document.getElementById('progressBar');
 const previousButton = document.getElementById('previousButton');
@@ -55,7 +54,6 @@ function renderPage(direction = '') {
   book.classList.toggle('cover', Boolean(page.cover));
   illustrationWrap.className = `illustration-wrap${page.images.length > 1 ? ' two-images' : ''}`;
   illustrationWrap.innerHTML = page.images.map((src, index) => `<img src="${src}" alt="Ilustración de la página ${currentPage + 1}${page.images.length > 1 ? `, imagen ${index + 1}` : ''}" draggable="false">`).join('') + '<button class="expand-image" type="button" aria-label="Ver la ilustración principal a pantalla completa" title="Pantalla completa">⛶</button>';
-  chapter.textContent = page.cover ? '' : `Capítulo ${currentPage}`;
   storyText.innerHTML = page.text.map(paragraph => `<p>${paragraph}</p>`).join('');
   pageNumber.textContent = `Página ${currentPage + 1} de ${pages.length}`;
   progressBar.style.width = `${((currentPage + 1) / pages.length) * 100}%`;
