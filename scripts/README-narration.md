@@ -34,7 +34,10 @@ regenerate those cached lines.
 - Tiger: `zagan`
 - Goblins: `sirius`, with four distinct speed/pitch styles
 
-The goblins use xAI speech tags for deep, squeaky, slow, and sing-song tones,
-plus laughs, chuckles, giggles, and tongue clicks. Edit the `VOICES` and
+The goblins use high-pitch xAI speech tags with cheerful, eager, theatrical,
+and sing-song tones, plus laughs, chuckles, giggles, and tongue clicks. Edit the `VOICES` and
 `PAGES` constants near the top of the script to audition a different cast or
 performance.
+
+The loud comic fart in the goblin scene is synthesized locally and inserted
+immediately after the “nube brillante” line. It does not consume API credits.
