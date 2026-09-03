@@ -39,5 +39,5 @@ and sing-song tones, plus laughs, chuckles, giggles, and tongue clicks. Edit the
 `PAGES` constants near the top of the script to audition a different cast or
 performance.
 
-The loud comic fart in the goblin scene is synthesized locally and inserted
-immediately after the “nube brillante” line. It does not consume API credits.
+The comic fart cues use a bundled public-domain recording and do not consume
+API credits. Source and processing details are in `scripts/assets/README.md`.
