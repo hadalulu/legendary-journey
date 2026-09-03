@@ -1,9 +1,46 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>hello</title>
+  <meta name="theme-color" content="#2c1745">
+  <title>La Poderosa Hada Lulú</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
-<body>hello</body>
+<body>
+  <main class="reader" aria-label="Libro interactivo La Poderosa Hada Lulú">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Un cuento mágico</p>
+        <h1>La Poderosa Hada Lulú</h1>
+      </div>
+      <button class="sound-button" id="listenButton" type="button" aria-label="Escuchar esta página">
+        <span aria-hidden="true">▶</span>
+        <span id="listenLabel">Escuchar</span>
+      </button>
+    </header>
+
+    <section class="book-shell" aria-live="polite">
+      <button class="page-arrow previous" id="previousButton" type="button" aria-label="Página anterior">‹</button>
+      <article class="book" id="book">
+        <div class="illustration-wrap" id="illustrationWrap"></div>
+        <div class="story-copy">
+          <p class="chapter" id="chapter"></p>
+          <div class="story-text" id="storyText"></div>
+        </div>
+      </article>
+      <button class="page-arrow next" id="nextButton" type="button" aria-label="Página siguiente">›</button>
+    </section>
+
+    <footer class="book-footer">
+      <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+      <p id="pageNumber">Página 1</p>
+      <p class="hint">Usa las flechas o desliza para pasar de página</p>
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
 </html>
