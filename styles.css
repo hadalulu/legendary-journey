@@ -122,6 +122,56 @@ h1 {
 .book.turn-next { animation: turnNext .48s ease both; transform-origin: right center; }
 .book.turn-previous { animation: turnPrevious .48s ease both; transform-origin: left center; }
 
+.magic-flight {
+  position: absolute;
+  z-index: 8;
+  left: -70px;
+  top: 38%;
+  width: 56px;
+  height: 56px;
+  pointer-events: none;
+  animation: fairyFlight 1.15s cubic-bezier(.22,.75,.31,1) both;
+}
+
+.flying-fairy {
+  position: absolute;
+  z-index: 2;
+  display: block;
+  font-size: 2.25rem;
+  filter: drop-shadow(0 0 9px rgba(255, 224, 126, .95));
+  animation: fairyFlutter .16s ease-in-out infinite alternate;
+}
+
+.flight-sparkle {
+  position: absolute;
+  left: 8px;
+  top: 25px;
+  width: var(--spark-size);
+  height: var(--spark-size);
+  border-radius: 50%;
+  background: #fff7bb;
+  box-shadow: 0 0 9px #ffd766, 0 0 17px rgba(255, 202, 97, .8);
+  animation: sparkleFade .72s ease-out var(--spark-delay) both;
+}
+
+@keyframes fairyFlight {
+  0% { transform: translate(-5vw, 30px) rotate(-8deg); opacity: 0; }
+  12% { opacity: 1; }
+  45% { transform: translate(45vw, -32px) rotate(5deg); }
+  100% { transform: translate(calc(100vw + 90px), 18px) rotate(-4deg); opacity: 1; }
+}
+
+@keyframes fairyFlutter {
+  from { transform: translateY(-3px) rotate(-3deg) scale(.96); }
+  to { transform: translateY(3px) rotate(3deg) scale(1.04); }
+}
+
+@keyframes sparkleFade {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  18% { opacity: 1; }
+  100% { transform: translate(var(--spark-x), var(--spark-y)) scale(.15); opacity: 0; }
+}
+
 @keyframes turnNext {
   0% { transform: rotateY(0); opacity: 1; }
   45% { transform: rotateY(-12deg) scale(.985); opacity: .55; }
@@ -318,4 +368,5 @@ h1 {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .magic-flight { display: none; }
 }
