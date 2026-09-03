@@ -50,6 +50,7 @@ function stopSpeaking() {
 
 function renderPage(direction = '') {
   stopSpeaking();
+  document.querySelectorAll('.magic-flight, .fairy-trace').forEach(element => element.remove());
   const page = pages[currentPage];
   book.classList.toggle('cover', Boolean(page.cover));
   illustrationWrap.className = `illustration-wrap${page.images.length > 1 ? ' two-images' : ''}`;
@@ -76,22 +77,34 @@ function changePage(delta) {
 }
 
 function playFairyFlight() {
-  document.querySelector('.magic-flight')?.remove();
   const flight = document.createElement('div');
   flight.className = 'magic-flight';
   flight.setAttribute('aria-hidden', 'true');
   flight.innerHTML = '<span class="flying-fairy">🧚</span>';
-  for (let index = 0; index < 14; index += 1) {
-    const sparkle = document.createElement('span');
-    sparkle.className = 'flight-sparkle';
-    sparkle.style.setProperty('--spark-size', `${3 + (index % 4) * 2}px`);
-    sparkle.style.setProperty('--spark-delay', `${index * .035}s`);
-    sparkle.style.setProperty('--spark-x', `${-22 - index * 8}px`);
-    sparkle.style.setProperty('--spark-y', `${(index % 3 - 1) * 15}px`);
-    flight.appendChild(sparkle);
-  }
   book.appendChild(flight);
-  flight.addEventListener('animationend', () => flight.remove(), { once: true });
+  const startedAt = performance.now();
+  const duration = 2400;
+
+  function leaveSparkle(now) {
+    if (!flight.isConnected) return;
+    const progress = Math.min((now - startedAt) / duration, 1);
+    const sparkle = document.createElement('span');
+    const size = 3 + Math.random() * 6;
+    sparkle.className = 'fairy-trace';
+    sparkle.setAttribute('aria-hidden', 'true');
+    sparkle.style.left = `${-18 + progress * (book.clientWidth + 36)}px`;
+    sparkle.style.top = `${book.clientHeight * .38 + 28 + Math.sin(progress * Math.PI * 3) * 28 + (Math.random() - .5) * 18}px`;
+    sparkle.style.setProperty('--spark-size', `${size}px`);
+    sparkle.style.setProperty('--spark-drift', `${(Math.random() - .5) * 45}px`);
+    book.appendChild(sparkle);
+    setTimeout(() => sparkle.remove(), 2300);
+    if (progress < 1) setTimeout(() => requestAnimationFrame(leaveSparkle), 85);
+  }
+
+  requestAnimationFrame(leaveSparkle);
+  flight.addEventListener('animationend', event => {
+    if (event.animationName === 'fairyFlight') flight.remove();
+  });
 }
 
 function listen() {
