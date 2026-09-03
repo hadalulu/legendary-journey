@@ -28,6 +28,7 @@ API_URL = "https://api.x.ai/v1/tts"
 LANGUAGE = "es-MX"
 SAMPLE_RATE = 44_100
 PAUSE_MS = 360
+EFFECT_VERSION = 2
 
 # The four goblins share a base voice so they sound related, but use distinct
 # rates and documented xAI speech tags for clearly different personalities.
@@ -121,30 +122,48 @@ def request_wav(api_key: str, role: str, text: str) -> bytes:
 
 
 def generate_loud_fart_wav() -> bytes:
-    """Create a short comic sound effect without an additional API request."""
-    duration = 1.05
+    """Create an irregular, breathy comic raspberry/fart sound."""
+    duration = 1.28
     total_frames = round(SAMPLE_RATE * duration)
     rng = random.Random(0xFA47)
-    phase = 0.0
-    smoothed_noise = 0.0
+    flutter_phase = 0.0
+    body_phase = 0.0
+    brown_noise = 0.0
+    low_noise = 0.0
+    previous = 0.0
     frames = bytearray()
 
     for index in range(total_frames):
         t = index / SAMPLE_RATE
         progress = t / duration
-        frequency = 92 - 44 * progress + 8 * math.sin(2 * math.pi * 7 * t)
-        phase += 2 * math.pi * frequency / SAMPLE_RATE
-        smoothed_noise = 0.94 * smoothed_noise + 0.06 * rng.uniform(-1, 1)
-        flutter = 0.72 + 0.28 * math.sin(2 * math.pi * 13 * t)
-        attack = min(t / 0.035, 1.0)
-        release = max(0.0, (1.0 - progress) ** 0.65)
-        envelope = attack * release
-        sample = envelope * flutter * (
-            0.72 * math.sin(phase)
-            + 0.18 * math.sin(2.03 * phase)
-            + 0.32 * smoothed_noise
+        # Three overlapping air bursts avoid the steady electronic-note sound.
+        bursts = (
+            math.exp(-((t - 0.22) / 0.19) ** 2)
+            + 0.82 * math.exp(-((t - 0.62) / 0.24) ** 2)
+            + 0.56 * math.exp(-((t - 1.00) / 0.20) ** 2)
         )
-        sample = max(-0.94, min(0.94, sample))
+        attack = min(t / 0.018, 1.0)
+        release = min(max((duration - t) / 0.10, 0.0), 1.0)
+        envelope = min(1.0, bursts) * attack * release
+
+        flutter_hz = 29 - 8 * progress + 2.8 * math.sin(2 * math.pi * 3.7 * t)
+        flutter_phase += 2 * math.pi * flutter_hz / SAMPLE_RATE
+        lip_pulse = max(0.0, math.sin(flutter_phase)) ** 1.7
+        lip_pulse *= 0.76 + 0.24 * math.sin(2 * math.pi * 5.3 * t + 0.4)
+
+        body_hz = 82 - 31 * progress + 5 * math.sin(2 * math.pi * 2.1 * t)
+        body_phase += 2 * math.pi * body_hz / SAMPLE_RATE
+        white = rng.uniform(-1.0, 1.0)
+        brown_noise = 0.985 * brown_noise + 0.015 * white
+        low_noise = 0.82 * low_noise + 0.18 * white
+        breath = 1.8 * low_noise + 2.6 * brown_noise
+        body = math.sin(body_phase) + 0.33 * math.sin(2.06 * body_phase)
+        raw = envelope * (0.72 * lip_pulse * breath + 0.34 * lip_pulse * body)
+
+        # Remove rumbling DC while preserving the deliberately low, wet timbre.
+        sample = raw - previous * 0.965
+        previous = raw
+        sample = math.tanh(sample * 2.8) * 0.92
         frames.extend(struct.pack("<h", round(sample * 32_767)))
 
     buffer = io.BytesIO()
@@ -157,7 +176,7 @@ def generate_loud_fart_wav() -> bytes:
 
 
 def cached_effect(cache_dir: Path, name: str, force: bool) -> Path:
-    path = cache_dir / f"effect-{name}.wav"
+    path = cache_dir / f"effect-{name}-v{EFFECT_VERSION}.wav"
     if force or not path.exists():
         if name != "loud_fart":
             raise ValueError(f"Unknown sound effect: {name}")
