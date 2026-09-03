@@ -10,9 +10,13 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
+import math
 import os
 from pathlib import Path
+import random
+import struct
 import sys
 import time
 import urllib.error
@@ -44,6 +48,10 @@ def line(role: str, text: str) -> dict[str, str]:
     return {"role": role, "text": text}
 
 
+def effect(name: str) -> dict[str, str]:
+    return {"kind": "effect", "name": name}
+
+
 # Speech tags are sent to xAI, but are not spoken aloud. Each inner list is one
 # finished page; its segments are synthesized separately, then joined to WAV.
 PAGES = [
@@ -53,7 +61,7 @@ PAGES = [
     [line("narrator", "¿Sabes quiénes son los malos que siempre enojan a las hadas, Lulú? [pause] Son los duendes. [pause] Los duendes son unas criaturitas pequeñitas, del tamaño de un peluche. Tienen la piel verde, orejas grandes y puntiagudas, una nariz redonda y una sonrisa traviesa. Les encanta hacer bromas, como esconder un calcetín, mover un juguete de lugar o hacer mucho desorden. No son malos de verdad. Solo son muy, muy traviesos y casi nunca piensan antes de hacer una travesura.")],
     [line("narrator", "Cada noche, las hadas salen volando de su bosque encantado para visitar, en secreto, las casas de los niños mientras duermen. Llevan consigo un polvito mágico y brillante llamado polvo de hada, que ayuda a que los niños tengan sueños felices y tranquilos. [pause] Entran muy despacito en cada habitación y dejan caer un poquito de polvo sobre los niños dormidos. Entonces, los niños sueñan con aventuras, arcoíris, dinosaurios amistosos y cachorritos juguetones.")],
     [line("narrator", "Una noche, justo cuando el hada Lulú iba a salir del bosque encantado, escuchó unas risitas detrás de un árbol."), line("goblin_2", "<higher-pitch><whisper>[giggle] Je, je, je...</whisper></higher-pitch>"), line("narrator", "Lulú se acercó muy despacito para escuchar.")],
-    [line("narrator", "[inhale] <loud><emphasis>¡Eran cuatro duendes!</emphasis></loud>"), line("goblin_1", "<higher-pitch>[chuckle] <build-intensity>¡Hoy vamos a hacer la travesura más grande de todas!</build-intensity></higher-pitch>"), line("goblin_2", "<higher-pitch>[giggle] <fast>¡Vamos a llevarnos todo el polvo de hada!</fast></higher-pitch>"), line("goblin_3", "<higher-pitch><sing-song>¡Después lo llevaremos a los otros duendes que nos esperan en el bosque y lo aventaremos por los aires para hacer una nube brillante!</sing-song> [laugh]</higher-pitch>"), line("goblin_4", "<higher-pitch>[tongue-click] [giggle] <sing-song>¡Y yo me voy a lavar las pompis con el polvo de hada!</sing-song> [giggle]</higher-pitch>"), line("narrator", "Los cuatro duendes se morían de la risa."), line("goblin_1", "<higher-pitch>[chuckle]</higher-pitch>"), line("goblin_2", "<higher-pitch>[giggle]</higher-pitch>"), line("goblin_3", "<higher-pitch>[laugh]</higher-pitch>"), line("goblin_4", "<higher-pitch>[giggle] [laugh]</higher-pitch>")],
+    [line("narrator", "[inhale] <loud><emphasis>¡Eran cuatro duendes!</emphasis></loud>"), line("goblin_1", "<higher-pitch>[chuckle] <build-intensity>¡Hoy vamos a hacer la travesura más grande de todas!</build-intensity></higher-pitch>"), line("goblin_2", "<higher-pitch>[giggle] <fast>¡Vamos a llevarnos todo el polvo de hada!</fast></higher-pitch>"), line("goblin_3", "<higher-pitch><sing-song>¡Después lo llevaremos a los otros duendes que nos esperan en el bosque y lo aventaremos por los aires para hacer una nube brillante!</sing-song></higher-pitch>"), effect("loud_fart"), line("goblin_3", "<higher-pitch>[laugh]</higher-pitch>"), line("goblin_4", "<higher-pitch>[tongue-click] [giggle] <sing-song>¡Y yo me voy a lavar las pompis con el polvo de hada!</sing-song> [giggle]</higher-pitch>"), line("narrator", "Los cuatro duendes se morían de la risa."), line("goblin_1", "<higher-pitch>[chuckle]</higher-pitch>"), line("goblin_2", "<higher-pitch>[giggle]</higher-pitch>"), line("goblin_3", "<higher-pitch>[laugh]</higher-pitch>"), line("goblin_4", "<higher-pitch>[giggle] [laugh]</higher-pitch>")],
     [line("narrator", "Lulú abrió mucho los ojos."), line("lulu", "<build-intensity>¡Oh, no! Si se llevan todo el polvo de hada, las hadas ya no podrán llevar sueños felices a los niños en las próximas noches.</build-intensity> [pause] ¡Ya sé! Yo soy el hada más rápida. Iré por ayuda."), line("narrator", "Y salió volando tan, tan rápido que parecía una estrella cruzando el cielo.")],
     [line("narrator", "Muy pronto encontró a sus amigas, las hadas Emma y Raquel."), line("lulu", "¡Los duendes quieren llevarse el polvo mágico!"), line("emma", "<loud>¡Vamos!</loud>"), line("raquel", "<loud>¡Vamos!</loud>"), line("lulu", "<loud>¡Vamos!</loud>"), line("narrator", "Las tres hadas llegaron al castillo tan rápido como pudieron y corrieron hasta la sala donde guardaban el polvo de hada.")],
     [line("lulu", "[inhale] ¡Ay, no!"), line("narrator", "El gran cofre del polvo de hada estaba abierto. [long-pause] ¡Y estaba completamente vacío! [long-pause] Por un momento, las tres hadas se quedaron en silencio.")],
@@ -112,6 +120,51 @@ def request_wav(api_key: str, role: str, text: str) -> bytes:
     raise RuntimeError("xAI TTS request failed")
 
 
+def generate_loud_fart_wav() -> bytes:
+    """Create a short comic sound effect without an additional API request."""
+    duration = 1.05
+    total_frames = round(SAMPLE_RATE * duration)
+    rng = random.Random(0xFA47)
+    phase = 0.0
+    smoothed_noise = 0.0
+    frames = bytearray()
+
+    for index in range(total_frames):
+        t = index / SAMPLE_RATE
+        progress = t / duration
+        frequency = 92 - 44 * progress + 8 * math.sin(2 * math.pi * 7 * t)
+        phase += 2 * math.pi * frequency / SAMPLE_RATE
+        smoothed_noise = 0.94 * smoothed_noise + 0.06 * rng.uniform(-1, 1)
+        flutter = 0.72 + 0.28 * math.sin(2 * math.pi * 13 * t)
+        attack = min(t / 0.035, 1.0)
+        release = max(0.0, (1.0 - progress) ** 0.65)
+        envelope = attack * release
+        sample = envelope * flutter * (
+            0.72 * math.sin(phase)
+            + 0.18 * math.sin(2.03 * phase)
+            + 0.32 * smoothed_noise
+        )
+        sample = max(-0.94, min(0.94, sample))
+        frames.extend(struct.pack("<h", round(sample * 32_767)))
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as target:
+        target.setnchannels(1)
+        target.setsampwidth(2)
+        target.setframerate(SAMPLE_RATE)
+        target.writeframes(frames)
+    return buffer.getvalue()
+
+
+def cached_effect(cache_dir: Path, name: str, force: bool) -> Path:
+    path = cache_dir / f"effect-{name}.wav"
+    if force or not path.exists():
+        if name != "loud_fart":
+            raise ValueError(f"Unknown sound effect: {name}")
+        path.write_bytes(generate_loud_fart_wav())
+    return path
+
+
 def cached_segment(
     api_key: str, cache_dir: Path, role: str, text: str, force: bool
 ) -> Path:
@@ -133,13 +186,11 @@ def read_wav(path: Path) -> tuple[wave._wave_params, bytes]:
         return source.getparams(), source.readframes(source.getnframes())
 
 
-def join_wavs(segment_paths: list[Path], output_path: Path) -> None:
-    first_params, first_frames = read_wav(segment_paths[0])
+def join_wavs(segment_paths: list[tuple[Path, int]], output_path: Path) -> None:
+    first_params, first_frames = read_wav(segment_paths[0][0])
     chunks = [first_frames]
-    silence_frames = round(first_params.framerate * PAUSE_MS / 1000)
-    silence = b"\x00" * silence_frames * first_params.nchannels * first_params.sampwidth
 
-    for path in segment_paths[1:]:
+    for path, pause_before_ms in segment_paths[1:]:
         params, frames = read_wav(path)
         comparable = (
             params.nchannels,
@@ -155,6 +206,13 @@ def join_wavs(segment_paths: list[Path], output_path: Path) -> None:
         )
         if comparable != expected:
             raise RuntimeError(f"Incompatible WAV format in {path}")
+        silence_frames = round(first_params.framerate * pause_before_ms / 1000)
+        silence = (
+            b"\x00"
+            * silence_frames
+            * first_params.nchannels
+            * first_params.sampwidth
+        )
         chunks.extend((silence, frames))
 
     with wave.open(str(output_path), "wb") as target:
@@ -212,10 +270,19 @@ def main() -> int:
         print(f"Page {page_number:02d}/{len(PAGES)} -> {destination}")
         segments = []
         for item in PAGES[page_number - 1]:
+            if item.get("kind") == "effect":
+                print(f"  effect: {item['name']}")
+                segments.append(
+                    (cached_effect(cache_dir, item["name"], args.force), 0)
+                )
+                continue
             print(f"  {item['role']}: {item['text'][:54]}...")
             segments.append(
-                cached_segment(
-                    api_key, cache_dir, item["role"], item["text"], args.force
+                (
+                    cached_segment(
+                        api_key, cache_dir, item["role"], item["text"], args.force
+                    ),
+                    PAUSE_MS,
                 )
             )
         join_wavs(segments, destination)
