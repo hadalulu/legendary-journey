@@ -130,7 +130,7 @@ h1 {
   width: 56px;
   height: 56px;
   pointer-events: none;
-  animation: fairyFlight 1.15s cubic-bezier(.22,.75,.31,1) both;
+  animation: fairyFlight 2.4s cubic-bezier(.22,.62,.31,1) both;
 }
 
 .flying-fairy {
@@ -142,16 +142,16 @@ h1 {
   animation: fairyFlutter .16s ease-in-out infinite alternate;
 }
 
-.flight-sparkle {
+.fairy-trace {
   position: absolute;
-  left: 8px;
-  top: 25px;
+  z-index: 7;
   width: var(--spark-size);
   height: var(--spark-size);
   border-radius: 50%;
   background: #fff7bb;
   box-shadow: 0 0 9px #ffd766, 0 0 17px rgba(255, 202, 97, .8);
-  animation: sparkleFade .72s ease-out var(--spark-delay) both;
+  pointer-events: none;
+  animation: sparkleTrace 2.25s ease-out both;
 }
 
 @keyframes fairyFlight {
@@ -166,10 +166,10 @@ h1 {
   to { transform: translateY(3px) rotate(3deg) scale(1.04); }
 }
 
-@keyframes sparkleFade {
-  0% { transform: translate(0, 0) scale(1); opacity: 0; }
-  18% { opacity: 1; }
-  100% { transform: translate(var(--spark-x), var(--spark-y)) scale(.15); opacity: 0; }
+@keyframes sparkleTrace {
+  0% { transform: translateY(0) scale(.6) rotate(0); opacity: .95; }
+  42% { opacity: .78; }
+  100% { transform: translateY(var(--spark-drift)) scale(.08) rotate(140deg); opacity: 0; }
 }
 
 @keyframes turnNext {
@@ -368,5 +368,5 @@ h1 {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
-  .magic-flight { display: none; }
+  .magic-flight, .fairy-trace { display: none; }
 }
