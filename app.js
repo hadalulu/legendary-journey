@@ -35,6 +35,9 @@ const previousButton = document.getElementById('previousButton');
 const nextButton = document.getElementById('nextButton');
 const listenButton = document.getElementById('listenButton');
 const listenLabel = document.getElementById('listenLabel');
+const imageViewer = document.getElementById('imageViewer');
+const viewerImage = document.getElementById('viewerImage');
+const viewerClose = document.getElementById('viewerClose');
 
 let currentPage = Number(sessionStorage.getItem('story-page') || 0);
 if (currentPage < 0 || currentPage >= pages.length) currentPage = 0;
@@ -51,7 +54,7 @@ function renderPage(direction = '') {
   const page = pages[currentPage];
   book.classList.toggle('cover', Boolean(page.cover));
   illustrationWrap.className = `illustration-wrap${page.images.length > 1 ? ' two-images' : ''}`;
-  illustrationWrap.innerHTML = page.images.map((src, index) => `<img src="${src}" alt="Ilustración de la página ${currentPage + 1}${page.images.length > 1 ? `, imagen ${index + 1}` : ''}" draggable="false">`).join('');
+  illustrationWrap.innerHTML = page.images.map((src, index) => `<img src="${src}" alt="Ilustración de la página ${currentPage + 1}${page.images.length > 1 ? `, imagen ${index + 1}` : ''}" draggable="false">`).join('') + '<button class="expand-image" type="button" aria-label="Ver la ilustración principal a pantalla completa" title="Pantalla completa">⛶</button>';
   chapter.textContent = page.cover ? '' : `Capítulo ${currentPage}`;
   storyText.innerHTML = page.text.map(paragraph => `<p>${paragraph}</p>`).join('');
   pageNumber.textContent = `Página ${currentPage + 1} de ${pages.length}`;
@@ -95,13 +98,40 @@ function listen() {
   speechSynthesis.speak(utterance);
 }
 
+function openImageViewer() {
+  const mainImage = illustrationWrap.querySelector('img');
+  if (!mainImage) return;
+  viewerImage.src = mainImage.src;
+  viewerImage.alt = mainImage.alt;
+  imageViewer.hidden = false;
+  document.body.style.overflow = 'hidden';
+  viewerClose.focus();
+}
+
+function closeImageViewer() {
+  imageViewer.hidden = true;
+  viewerImage.src = '';
+  document.body.style.overflow = '';
+  illustrationWrap.querySelector('.expand-image')?.focus();
+}
+
 previousButton.addEventListener('click', () => changePage(-1));
 nextButton.addEventListener('click', () => changePage(1));
 listenButton.addEventListener('click', listen);
+illustrationWrap.addEventListener('click', event => {
+  if (event.target.closest('.expand-image')) openImageViewer();
+});
+viewerClose.addEventListener('click', closeImageViewer);
+imageViewer.addEventListener('click', event => {
+  if (event.target === imageViewer) closeImageViewer();
+});
 document.addEventListener('keydown', event => {
   if (event.key === 'ArrowLeft') changePage(-1);
   if (event.key === 'ArrowRight') changePage(1);
-  if (event.key === 'Escape') stopSpeaking();
+  if (event.key === 'Escape') {
+    if (!imageViewer.hidden) closeImageViewer();
+    else stopSpeaking();
+  }
 });
 book.addEventListener('touchstart', event => { touchStartX = event.changedTouches[0].clientX; }, { passive: true });
 book.addEventListener('touchend', event => {
