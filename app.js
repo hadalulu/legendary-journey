@@ -54,6 +54,9 @@ let microphoneProcessor = null;
 let playbackContext = null;
 let playbackCursor = 0;
 let conversationStartedAt = 0;
+let initialFollowupTimer = null;
+let waitingForFirstReply = false;
+let initialFollowupSent = false;
 
 function stopSpeaking(cancelConversation = true) {
   narrationAudio.pause();
@@ -62,7 +65,7 @@ function stopSpeaking(cancelConversation = true) {
     endVoiceConversation();
   }
   listenButton.classList.remove('is-speaking');
-  listenLabel.textContent = currentPage === PAGE_18_INDEX ? 'Hablar con Lulú' : 'Escuchar';
+  listenLabel.textContent = currentPage === PAGE_18_INDEX ? 'Iniciar conversación' : 'Escuchar';
 }
 
 function renderPage(direction = '') {
@@ -74,6 +77,7 @@ function renderPage(direction = '') {
   illustrationWrap.innerHTML = page.images.map((src, index) => `<img src="${src}" alt="Ilustración de la página ${currentPage + 1}${page.images.length > 1 ? `, imagen ${index + 1}` : ''}" draggable="false">`).join('') + '<button class="expand-image" type="button" aria-label="Ver la ilustración principal a pantalla completa" title="Pantalla completa">⛶</button>';
   storyText.innerHTML = page.text.map(paragraph => `<p>${paragraph}</p>`).join('');
   if (currentPage === PAGE_18_INDEX) renderConversationControls();
+  listenButton.setAttribute('aria-label', currentPage === PAGE_18_INDEX ? 'Iniciar conversación con Lulú' : 'Escuchar esta página');
   pageNumber.textContent = `Página ${currentPage + 1} de ${pages.length}`;
   progressBar.style.width = `${((currentPage + 1) / pages.length) * 100}%`;
   previousButton.disabled = currentPage === 0;
@@ -157,23 +161,14 @@ narrationAudio.addEventListener('error', () => {
 function renderConversationControls() {
   storyText.insertAdjacentHTML('beforeend', `
     <div class="conversation" id="conversation">
-      <p class="conversation-status" id="conversationStatus">Toca el botón para conversar con Lulú.</p>
-      <div class="conversation-actions">
-        <button class="conversation-button" id="conversationButton" type="button">Hablar con Lulú</button>
-      </div>
+      <p class="conversation-status" id="conversationStatus">Usa “Iniciar conversación” arriba para hablar con Lulú.</p>
     </div>
   `);
-  document.getElementById('conversationButton').addEventListener('click', togglePage18Conversation);
 }
 
 function setConversationStatus(message) {
   const status = document.getElementById('conversationStatus');
   if (status) status.textContent = message;
-}
-
-function togglePage18Conversation() {
-  if (conversationState === 'idle') startPage18Conversation();
-  else endVoiceConversation();
 }
 
 async function startPage18Conversation() {
@@ -228,6 +223,8 @@ async function configureVoiceSession() {
   if (!voiceSocket || voiceSocket.readyState !== WebSocket.OPEN || !microphoneStream) return;
   microphoneContext = new AudioContext();
   await microphoneContext.resume();
+  waitingForFirstReply = true;
+  initialFollowupSent = false;
 
   voiceSocket.send(JSON.stringify({
     type: 'session.update',
@@ -296,15 +293,44 @@ function handleVoiceEvent(message) {
     if (audio) queuePcmAudio(audio);
     setConversationStatus('Lulú está respondiendo…');
   } else if (event.type === 'input_audio_buffer.speech_started') {
+    waitingForFirstReply = false;
+    clearTimeout(initialFollowupTimer);
+    initialFollowupTimer = null;
     setConversationStatus('Lulú te está escuchando…');
   } else if (event.type === 'input_audio_buffer.speech_stopped') {
     setConversationStatus('Lulú está pensando…');
   } else if (event.type === 'response.done') {
     setConversationStatus('Te escucho… habla con Lulú.');
+    scheduleInitialFollowup();
   } else if (event.type === 'error') {
     console.error('xAI voice error', event);
     failVoiceConversation('Lulú tuvo un problema para escucharte. Inténtalo otra vez.');
   }
+}
+
+function scheduleInitialFollowup() {
+  if (!waitingForFirstReply || initialFollowupSent || conversationState !== 'active') return;
+  clearTimeout(initialFollowupTimer);
+  const queuedAudioMs = playbackContext
+    ? Math.max(0, playbackCursor - playbackContext.currentTime) * 1000
+    : 0;
+  initialFollowupTimer = setTimeout(() => {
+    if (!waitingForFirstReply || initialFollowupSent || voiceSocket?.readyState !== WebSocket.OPEN) return;
+    initialFollowupSent = true;
+    voiceSocket.send(JSON.stringify({
+      type: 'conversation.item.create',
+      item: {
+        type: 'force_message',
+        role: 'assistant',
+        interruptible: false,
+        content: [{
+          type: 'output_text',
+          text: 'Sí, ¡a ti! Estamos hablando contigo, nuestra pequeña lectora. Sin tu ayuda, el hechizo no funcionará.'
+        }]
+      }
+    }));
+    setConversationStatus('Lulú te anima a responder…');
+  }, queuedAudioMs + 6500);
 }
 
 function queuePcmAudio(base64Audio) {
@@ -340,17 +366,19 @@ function base64ToBytes(value) {
 
 function setConversationUi(status, buttonText) {
   setConversationStatus(status);
-  const button = document.getElementById('conversationButton');
-  if (button) button.textContent = buttonText;
   listenButton.classList.toggle('is-speaking', conversationState !== 'idle');
-  listenLabel.textContent = conversationState === 'idle' ? 'Hablar con Lulú' : 'Terminar';
+  listenLabel.textContent = conversationState === 'idle' ? 'Iniciar conversación' : buttonText;
 }
 
 function failVoiceConversation(message) {
   endVoiceConversation(message);
 }
 
-function endVoiceConversation(message = 'Toca el botón para conversar con Lulú.') {
+function endVoiceConversation(message = 'Usa “Iniciar conversación” arriba para hablar con Lulú.') {
+  clearTimeout(initialFollowupTimer);
+  initialFollowupTimer = null;
+  waitingForFirstReply = false;
+  initialFollowupSent = false;
   const socket = voiceSocket;
   voiceSocket = null;
   if (socket && socket.readyState < WebSocket.CLOSING) socket.close();
@@ -366,7 +394,7 @@ function endVoiceConversation(message = 'Toca el botón para conversar con Lulú
   playbackContext = null;
   playbackCursor = 0;
   conversationState = 'idle';
-  setConversationUi(message, 'Hablar con Lulú');
+  setConversationUi(message, 'Iniciar conversación');
 }
 
 function openImageViewer() {

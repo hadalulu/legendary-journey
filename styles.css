@@ -93,30 +93,10 @@ h1 {
 }
 
 .conversation-status {
-  margin: 0 0 .75rem;
+  margin: 0;
   color: var(--plum);
   font-weight: 700;
 }
-
-.conversation-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .65rem;
-}
-
-.conversation-button,
-.ready-button {
-  min-height: 44px;
-  padding: .65rem 1rem;
-  border: 0;
-  border-radius: 999px;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.conversation-button { background: var(--berry); color: white; }
-.ready-button { background: #f1d86f; color: #342140; }
 
 .book-shell {
   min-height: 0;
