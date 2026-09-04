@@ -18,7 +18,7 @@ const pages = [
   { images: [asset('BBBC5351-F277-4144-90B8-4B03AE8D7838')], text: ['Al mismo tiempo, Lulú siguió el caminito de polvo brillante y encontró a los cuatro duendes que llevaban el saco de polvo de hada.', '—¡Ni se te ocurra usar tu magia! Si levantas tu varita, romperemos el saco y todo el polvo se perderá.', 'Lulú sonrió.', '—Muy bien. Entonces… no usaré mi magia.', 'Los duendes empezaron a reír.', '—¡Je, je, je!'] },
   { images: [asset('17265E38-8F97-455D-8BE9-1ECBCA007E41')], text: ['Pero Lulú le guiñó un ojo a su tigrito.', 'El tigrito dio un saltito.', '<strong>¡Puf! En un abrir y cerrar de ojos se convirtió en un enorme tigre protector.</strong>', '—¡ROOOAAAR!', 'Los duendes dieron un brinco del susto y salieron corriendo, dejando el saco de polvo de hada en el suelo.', 'Lulú lo recogió y sonrió.', '—¡Lo recuperamos!'] },
   { images: [asset('6122E77E-2D77-4CCA-98B9-09248F9C21B0'), asset('90F4B904-7CA9-4468-8112-81A25E72DDDE')], text: ['Lulú voló hasta la colina donde estaban Emma y Raquel. Allí, Raquel había atrapado al gran grupo de duendes.', 'Poco después llegaron corriendo los cuatro ladrones y las enredaderas también los atraparon.', '—¡Lo logramos! —dijo Lulú, enseñando el saco de polvo de hada.', '—¡Y el bosque está a salvo! —añadió Emma.', 'Pero Lulú se quedó pensativa.', '—Ahora que conocen el camino al castillo… ¿qué podemos hacer para que no vuelvan?'] },
-  { images: [asset('1A1624A9-4AE4-4098-96DA-D378CF3E9ED7')], text: ['—Necesitamos hacer un hechizo muy poderoso. Pero solo funciona si las tres hadas… ¡y la niña Lulu!… respiran juntas.', '¿Nos ayudas, niña Lulu?', 'Sí, <strong>¡a ti!</strong> Estamos hablando contigo, nuestra pequeña lectora. Sin tu ayuda, el hechizo no funcionará.'] },
+  { images: [asset('1A1624A9-4AE4-4098-96DA-D378CF3E9ED7')], text: ['—Necesitamos hacer un hechizo muy poderoso. Pero solo funciona si las tres hadas… ¡y la niña Lulú!… respiran juntas.', '¿Nos ayudas, niña Lulú?'] },
   { images: [asset('215C9F58-5F79-448C-AD06-22364547AA95')], text: ['Primero imaginemos que olemos una flor muy bonita.', 'Respira hondo…', 'Uno… dos… tres…', 'Ahora sopla una velita.', 'Fuuuu…', 'Otra vez.', 'Uno… dos… tres…', 'Fuuuu…', 'Y una última vez.', 'Uno… dos… tres…', 'Fuuuu…'] },
   { images: [asset('B92D705D-C72F-4307-9002-1D464F2184FD')], text: ['Las tres hadas apuntaron sus varitas al cielo.', '—¡Luz de luna, brillo de estrella, que los duendes olviden el camino al castillo y recuerden siempre el camino a su hogar!', '✨ ¡Zas! ✨'] },
   { images: [asset('3A1A63B6-E6C9-4299-B8CD-02E5349AE34C')], text: ['Los duendes parpadearon.', '—¿Qué estábamos haciendo?', '—¡No me acuerdo!', '—¡Vamos a casa!', 'Y se fueron riendo por el bosque.'] },
@@ -40,16 +40,26 @@ const viewerImage = document.getElementById('viewerImage');
 const viewerClose = document.getElementById('viewerClose');
 const narrationAudio = new Audio();
 narrationAudio.preload = 'metadata';
+const PAGE_18_INDEX = 17;
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 let currentPage = Number(sessionStorage.getItem('story-page') || 0);
 if (currentPage < 0 || currentPage >= pages.length) currentPage = 0;
 let touchStartX = 0;
+let recognition = null;
+let conversationState = 'idle';
 
-function stopSpeaking() {
+function stopSpeaking(cancelConversation = true) {
   narrationAudio.pause();
   narrationAudio.currentTime = 0;
+  window.speechSynthesis?.cancel();
+  if (cancelConversation) {
+    recognition?.abort();
+    recognition = null;
+    conversationState = 'idle';
+  }
   listenButton.classList.remove('is-speaking');
-  listenLabel.textContent = 'Escuchar';
+  listenLabel.textContent = currentPage === PAGE_18_INDEX ? 'Hablar con Lulú' : 'Escuchar';
 }
 
 function renderPage(direction = '') {
@@ -60,6 +70,7 @@ function renderPage(direction = '') {
   illustrationWrap.className = `illustration-wrap${page.images.length > 1 ? ' two-images' : ''}`;
   illustrationWrap.innerHTML = page.images.map((src, index) => `<img src="${src}" alt="Ilustración de la página ${currentPage + 1}${page.images.length > 1 ? `, imagen ${index + 1}` : ''}" draggable="false">`).join('') + '<button class="expand-image" type="button" aria-label="Ver la ilustración principal a pantalla completa" title="Pantalla completa">⛶</button>';
   storyText.innerHTML = page.text.map(paragraph => `<p>${paragraph}</p>`).join('');
+  if (currentPage === PAGE_18_INDEX) renderConversationControls();
   pageNumber.textContent = `Página ${currentPage + 1} de ${pages.length}`;
   progressBar.style.width = `${((currentPage + 1) / pages.length) * 100}%`;
   previousButton.disabled = currentPage === 0;
@@ -112,6 +123,12 @@ function playFairyFlight() {
 }
 
 function listen() {
+  if (currentPage === PAGE_18_INDEX) {
+    if (conversationState !== 'idle') stopSpeaking();
+    else startPage18Conversation();
+    return;
+  }
+
   if (!narrationAudio.paused && !narrationAudio.ended) {
     stopSpeaking();
     return;
@@ -128,11 +145,144 @@ function listen() {
   });
 }
 
-narrationAudio.addEventListener('ended', stopSpeaking);
+narrationAudio.addEventListener('ended', () => {
+  if (currentPage === PAGE_18_INDEX && conversationState === 'prompting') {
+    narrationAudio.currentTime = 0;
+    listenButton.classList.remove('is-speaking');
+    beginListeningForReady();
+  } else {
+    stopSpeaking();
+  }
+});
 narrationAudio.addEventListener('error', () => {
   stopSpeaking();
   listenLabel.textContent = 'No disponible';
 });
+
+function renderConversationControls() {
+  storyText.insertAdjacentHTML('beforeend', `
+    <div class="conversation" id="conversation">
+      <p class="conversation-status" id="conversationStatus">Toca el botón para hablar con Lulú.</p>
+      <div class="conversation-actions">
+        <button class="conversation-button" id="conversationButton" type="button">Hablar con Lulú</button>
+        <button class="ready-button" id="readyButton" type="button">¡Estoy lista!</button>
+      </div>
+    </div>
+  `);
+  document.getElementById('conversationButton').addEventListener('click', startPage18Conversation);
+  document.getElementById('readyButton').addEventListener('click', () => respondToReader('estoy lista'));
+}
+
+function setConversationStatus(message) {
+  const status = document.getElementById('conversationStatus');
+  if (status) status.textContent = message;
+}
+
+function startPage18Conversation() {
+  if (currentPage !== PAGE_18_INDEX || conversationState !== 'idle') return;
+  conversationState = 'prompting';
+  setConversationStatus('Lulú está hablando…');
+  listenButton.classList.add('is-speaking');
+  listenLabel.textContent = 'Detener';
+  const opening = new SpeechSynthesisUtterance('Necesitamos hacer un hechizo muy poderoso. Pero solo funciona si las tres hadas… ¡y la niña Lulú!… respiran juntas. ¿Nos ayudas, niña Lulú?');
+  opening.lang = 'es-MX';
+  opening.rate = 0.88;
+  opening.pitch = 1.12;
+  opening.onend = () => {
+    if (currentPage !== PAGE_18_INDEX || conversationState !== 'prompting') return;
+    listenButton.classList.remove('is-speaking');
+    beginListeningForReady();
+  };
+  opening.onerror = () => {
+    conversationState = 'idle';
+    stopSpeaking();
+    setConversationStatus('No se pudo reproducir la voz. Puedes tocar “¡Estoy lista!”.');
+  };
+  window.speechSynthesis.speak(opening);
+}
+
+function beginListeningForReady() {
+  if (currentPage !== PAGE_18_INDEX) return;
+  if (!SpeechRecognition) {
+    conversationState = 'idle';
+    listenLabel.textContent = 'Hablar con Lulú';
+    setConversationStatus('Tu navegador no puede escuchar la respuesta. Toca “¡Estoy lista!”.');
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = 'es-MX';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 3;
+  conversationState = 'listening';
+  listenButton.classList.add('is-speaking');
+  listenLabel.textContent = 'Escuchando…';
+  setConversationStatus('Te escucho… ¿estás lista?');
+
+  recognition.onresult = event => {
+    const replies = Array.from(event.results[0], result => result.transcript).join(' ');
+    recognition = null;
+    respondToReader(replies);
+  };
+  recognition.onerror = event => {
+    recognition = null;
+    conversationState = 'idle';
+    listenButton.classList.remove('is-speaking');
+    listenLabel.textContent = 'Intentar otra vez';
+    const denied = event.error === 'not-allowed' || event.error === 'service-not-allowed';
+    setConversationStatus(denied
+      ? 'Necesito permiso para usar el micrófono. También puedes tocar “¡Estoy lista!”.'
+      : 'No alcancé a escucharte. Toca “Intentar otra vez” o “¡Estoy lista!”.');
+  };
+  recognition.onend = () => {
+    if (conversationState === 'listening') {
+      recognition = null;
+      conversationState = 'idle';
+      listenButton.classList.remove('is-speaking');
+      listenLabel.textContent = 'Intentar otra vez';
+      setConversationStatus('No alcancé a escucharte. ¿Quieres intentarlo otra vez?');
+    }
+  };
+  recognition.start();
+}
+
+function respondToReader(rawReply) {
+  if (currentPage !== PAGE_18_INDEX) return;
+  recognition?.abort();
+  recognition = null;
+  const reply = rawReply.toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const isReady = /\b(si|sip|lista|listo|preparada|preparado|claro|vamos|ya)\b/.test(reply);
+  const response = isReady
+    ? '¡Maravilloso! Sabía que podía contar contigo. ¡Ya estamos listas para hacer el hechizo!'
+    : 'Está bien. Respira conmigo cuando estés lista. ¿Quieres ayudar a las hadas?';
+
+  conversationState = 'responding';
+  setConversationStatus(isReady ? '✨ ¡Lulú escuchó que estás lista!' : 'Lulú quiere asegurarse de que estés lista.');
+  listenButton.classList.add('is-speaking');
+  listenLabel.textContent = 'Lulú responde…';
+
+  const utterance = new SpeechSynthesisUtterance(response);
+  utterance.lang = 'es-MX';
+  utterance.rate = 0.9;
+  utterance.pitch = 1.15;
+  utterance.onend = () => {
+    if (currentPage !== PAGE_18_INDEX) return;
+    if (isReady) {
+      conversationState = 'idle';
+      listenButton.classList.remove('is-speaking');
+      listenLabel.textContent = 'Hablar otra vez';
+      document.getElementById('nextButton')?.focus();
+    } else {
+      beginListeningForReady();
+    }
+  };
+  utterance.onerror = () => {
+    conversationState = 'idle';
+    listenButton.classList.remove('is-speaking');
+    listenLabel.textContent = 'Intentar otra vez';
+  };
+  window.speechSynthesis.speak(utterance);
+}
 
 function openImageViewer() {
   const mainImage = illustrationWrap.querySelector('img');
