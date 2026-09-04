@@ -41,22 +41,25 @@ const viewerClose = document.getElementById('viewerClose');
 const narrationAudio = new Audio();
 narrationAudio.preload = 'metadata';
 const PAGE_18_INDEX = 17;
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 let currentPage = Number(sessionStorage.getItem('story-page') || 0);
 if (currentPage < 0 || currentPage >= pages.length) currentPage = 0;
 let touchStartX = 0;
-let recognition = null;
 let conversationState = 'idle';
+let voiceSocket = null;
+let microphoneStream = null;
+let microphoneContext = null;
+let microphoneSource = null;
+let microphoneProcessor = null;
+let playbackContext = null;
+let playbackCursor = 0;
+let conversationStartedAt = 0;
 
 function stopSpeaking(cancelConversation = true) {
   narrationAudio.pause();
   narrationAudio.currentTime = 0;
-  window.speechSynthesis?.cancel();
   if (cancelConversation) {
-    recognition?.abort();
-    recognition = null;
-    conversationState = 'idle';
+    endVoiceConversation();
   }
   listenButton.classList.remove('is-speaking');
   listenLabel.textContent = currentPage === PAGE_18_INDEX ? 'Hablar con Lulú' : 'Escuchar';
@@ -145,15 +148,7 @@ function listen() {
   });
 }
 
-narrationAudio.addEventListener('ended', () => {
-  if (currentPage === PAGE_18_INDEX && conversationState === 'prompting') {
-    narrationAudio.currentTime = 0;
-    listenButton.classList.remove('is-speaking');
-    beginListeningForReady();
-  } else {
-    stopSpeaking();
-  }
-});
+narrationAudio.addEventListener('ended', () => stopSpeaking());
 narrationAudio.addEventListener('error', () => {
   stopSpeaking();
   listenLabel.textContent = 'No disponible';
@@ -162,15 +157,13 @@ narrationAudio.addEventListener('error', () => {
 function renderConversationControls() {
   storyText.insertAdjacentHTML('beforeend', `
     <div class="conversation" id="conversation">
-      <p class="conversation-status" id="conversationStatus">Toca el botón para hablar con Lulú.</p>
+      <p class="conversation-status" id="conversationStatus">Toca el botón para conversar con Lulú.</p>
       <div class="conversation-actions">
         <button class="conversation-button" id="conversationButton" type="button">Hablar con Lulú</button>
-        <button class="ready-button" id="readyButton" type="button">¡Estoy lista!</button>
       </div>
     </div>
   `);
-  document.getElementById('conversationButton').addEventListener('click', startPage18Conversation);
-  document.getElementById('readyButton').addEventListener('click', () => respondToReader('estoy lista'));
+  document.getElementById('conversationButton').addEventListener('click', togglePage18Conversation);
 }
 
 function setConversationStatus(message) {
@@ -178,110 +171,202 @@ function setConversationStatus(message) {
   if (status) status.textContent = message;
 }
 
-function startPage18Conversation() {
+function togglePage18Conversation() {
+  if (conversationState === 'idle') startPage18Conversation();
+  else endVoiceConversation();
+}
+
+async function startPage18Conversation() {
   if (currentPage !== PAGE_18_INDEX || conversationState !== 'idle') return;
-  conversationState = 'prompting';
-  setConversationStatus('Lulú está hablando…');
-  listenButton.classList.add('is-speaking');
-  listenLabel.textContent = 'Detener';
-  const opening = new SpeechSynthesisUtterance('Necesitamos hacer un hechizo muy poderoso. Pero solo funciona si las tres hadas… ¡y la niña Lulú!… respiran juntas. ¿Nos ayudas, niña Lulú?');
-  opening.lang = 'es-MX';
-  opening.rate = 0.88;
-  opening.pitch = 1.12;
-  opening.onend = () => {
-    if (currentPage !== PAGE_18_INDEX || conversationState !== 'prompting') return;
-    listenButton.classList.remove('is-speaking');
-    beginListeningForReady();
-  };
-  opening.onerror = () => {
-    conversationState = 'idle';
-    stopSpeaking();
-    setConversationStatus('No se pudo reproducir la voz. Puedes tocar “¡Estoy lista!”.');
-  };
-  window.speechSynthesis.speak(opening);
-}
+  conversationState = 'connecting';
+  conversationStartedAt = Date.now();
+  setConversationUi('Conectando con Lulú…', 'Conectando…');
 
-function beginListeningForReady() {
-  if (currentPage !== PAGE_18_INDEX) return;
-  if (!SpeechRecognition) {
-    conversationState = 'idle';
-    listenLabel.textContent = 'Hablar con Lulú';
-    setConversationStatus('Tu navegador no puede escuchar la respuesta. Toca “¡Estoy lista!”.');
-    return;
+  try {
+    microphoneStream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    });
+    const tokenResponse = await fetch('/api/session', { method: 'POST' });
+    if (!tokenResponse.ok) throw new Error(`No se pudo iniciar la sesión (${tokenResponse.status})`);
+    const tokenData = await tokenResponse.json();
+    const token = findEphemeralToken(tokenData);
+    if (!token) throw new Error('La sesión no incluyó un token temporal');
+
+    playbackContext = new AudioContext({ sampleRate: 24000 });
+    await playbackContext.resume();
+    playbackCursor = playbackContext.currentTime;
+    voiceSocket = new WebSocket(
+      'wss://api.x.ai/v1/realtime?model=grok-voice-latest',
+      [`xai-client-secret.${token}`]
+    );
+    voiceSocket.addEventListener('open', configureVoiceSession);
+    voiceSocket.addEventListener('message', handleVoiceEvent);
+    voiceSocket.addEventListener('error', () => failVoiceConversation('No pude conectar con Lulú. Inténtalo otra vez.'));
+    voiceSocket.addEventListener('close', () => {
+      if (conversationState !== 'idle') failVoiceConversation('La conversación terminó. Puedes volver a intentarlo.');
+    });
+  } catch (error) {
+    console.error(error);
+    const denied = error?.name === 'NotAllowedError';
+    failVoiceConversation(denied
+      ? 'Necesito permiso para usar el micrófono.'
+      : 'No pude conectar con Lulú. Inténtalo otra vez.');
   }
-
-  recognition = new SpeechRecognition();
-  recognition.lang = 'es-MX';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 3;
-  conversationState = 'listening';
-  listenButton.classList.add('is-speaking');
-  listenLabel.textContent = 'Escuchando…';
-  setConversationStatus('Te escucho… ¿estás lista?');
-
-  recognition.onresult = event => {
-    const replies = Array.from(event.results[0], result => result.transcript).join(' ');
-    recognition = null;
-    respondToReader(replies);
-  };
-  recognition.onerror = event => {
-    recognition = null;
-    conversationState = 'idle';
-    listenButton.classList.remove('is-speaking');
-    listenLabel.textContent = 'Intentar otra vez';
-    const denied = event.error === 'not-allowed' || event.error === 'service-not-allowed';
-    setConversationStatus(denied
-      ? 'Necesito permiso para usar el micrófono. También puedes tocar “¡Estoy lista!”.'
-      : 'No alcancé a escucharte. Toca “Intentar otra vez” o “¡Estoy lista!”.');
-  };
-  recognition.onend = () => {
-    if (conversationState === 'listening') {
-      recognition = null;
-      conversationState = 'idle';
-      listenButton.classList.remove('is-speaking');
-      listenLabel.textContent = 'Intentar otra vez';
-      setConversationStatus('No alcancé a escucharte. ¿Quieres intentarlo otra vez?');
-    }
-  };
-  recognition.start();
 }
 
-function respondToReader(rawReply) {
-  if (currentPage !== PAGE_18_INDEX) return;
-  recognition?.abort();
-  recognition = null;
-  const reply = rawReply.toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const isReady = /\b(si|sip|lista|listo|preparada|preparado|claro|vamos|ya)\b/.test(reply);
-  const response = isReady
-    ? '¡Maravilloso! Sabía que podía contar contigo. ¡Ya estamos listas para hacer el hechizo!'
-    : 'Está bien. Respira conmigo cuando estés lista. ¿Quieres ayudar a las hadas?';
+function findEphemeralToken(value) {
+  if (!value || typeof value !== 'object') return null;
+  for (const key of ['value', 'token', 'secret', 'client_secret']) {
+    if (typeof value[key] === 'string' && value[key].length > 20) return value[key];
+    const nested = findEphemeralToken(value[key]);
+    if (nested) return nested;
+  }
+  return null;
+}
 
-  conversationState = 'responding';
-  setConversationStatus(isReady ? '✨ ¡Lulú escuchó que estás lista!' : 'Lulú quiere asegurarse de que estés lista.');
-  listenButton.classList.add('is-speaking');
-  listenLabel.textContent = 'Lulú responde…';
+async function configureVoiceSession() {
+  if (!voiceSocket || voiceSocket.readyState !== WebSocket.OPEN || !microphoneStream) return;
+  microphoneContext = new AudioContext();
+  await microphoneContext.resume();
 
-  const utterance = new SpeechSynthesisUtterance(response);
-  utterance.lang = 'es-MX';
-  utterance.rate = 0.9;
-  utterance.pitch = 1.15;
-  utterance.onend = () => {
-    if (currentPage !== PAGE_18_INDEX) return;
-    if (isReady) {
-      conversationState = 'idle';
-      listenButton.classList.remove('is-speaking');
-      listenLabel.textContent = 'Hablar otra vez';
-      document.getElementById('nextButton')?.focus();
-    } else {
-      beginListeningForReady();
+  voiceSocket.send(JSON.stringify({
+    type: 'session.update',
+    session: {
+      voice: 'eve',
+      instructions: `Eres Lulú, el hada protagonista de un cuento infantil. Hablas siempre en español mexicano, con calidez, alegría y frases breves apropiadas para una niña pequeña. Estás en la página donde necesitas que la lectora respire junto con las tres hadas para realizar un hechizo. Conversa de forma abierta sobre el cuento, la magia, sus sentimientos o preguntas, pero guía suavemente la charla hacia preguntarle si está lista para ayudar con el hechizo. Cuando diga que está lista, responde con entusiasmo, dile claramente que ya pueden hacer el hechizo juntas y sugiérele pasar a la siguiente página. Nunca pidas ni repitas apellidos, direcciones, escuela, teléfono, ubicación, contraseñas ni otros datos personales. Si comparte uno, dile amablemente que no necesita contarte información privada. No uses herramientas ni hables de temas sexuales, violentos, peligrosos o para adultos. Si pregunta algo inapropiado o preocupante, responde brevemente y sugiere hablar con un adulto de confianza. No digas que eres una IA; mantén el personaje de Lulú.`,
+      reasoning: { effort: 'none' },
+      turn_detection: { type: 'server_vad', threshold: 0.72 },
+      audio: {
+        input: {
+          format: { type: 'audio/pcm', rate: microphoneContext.sampleRate },
+          transcription: { language_hint: 'es-MX', keyterms: ['Lulú', 'hada', 'hechizo', 'lista'] }
+        },
+        output: { format: { type: 'audio/pcm', rate: 24000 } }
+      }
     }
+  }));
+
+  startMicrophoneStreaming();
+  voiceSocket.send(JSON.stringify({
+    type: 'conversation.item.create',
+    item: {
+      type: 'force_message',
+      role: 'assistant',
+      interruptible: false,
+      content: [{
+        type: 'output_text',
+        text: 'Necesitamos hacer un hechizo muy poderoso. Pero solo funciona si las tres hadas… ¡y la niña Lulú!… respiran juntas. ¿Nos ayudas, niña Lulú?'
+      }]
+    }
+  }));
+  conversationState = 'active';
+  setConversationUi('Lulú está hablando… Después puedes responderle.', 'Terminar');
+}
+
+function startMicrophoneStreaming() {
+  microphoneSource = microphoneContext.createMediaStreamSource(microphoneStream);
+  microphoneProcessor = microphoneContext.createScriptProcessor(4096, 1, 1);
+  const silentGain = microphoneContext.createGain();
+  silentGain.gain.value = 0;
+  microphoneProcessor.onaudioprocess = event => {
+    if (voiceSocket?.readyState !== WebSocket.OPEN || conversationState !== 'active') return;
+    if (Date.now() - conversationStartedAt > 5 * 60 * 1000) {
+      endVoiceConversation('La conversación terminó después de cinco minutos.');
+      return;
+    }
+    const samples = event.inputBuffer.getChannelData(0);
+    const pcm = new Int16Array(samples.length);
+    for (let i = 0; i < samples.length; i += 1) {
+      const sample = Math.max(-1, Math.min(1, samples[i]));
+      pcm[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+    }
+    voiceSocket.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: bytesToBase64(new Uint8Array(pcm.buffer)) }));
   };
-  utterance.onerror = () => {
-    conversationState = 'idle';
-    listenButton.classList.remove('is-speaking');
-    listenLabel.textContent = 'Intentar otra vez';
-  };
-  window.speechSynthesis.speak(utterance);
+  microphoneSource.connect(microphoneProcessor);
+  microphoneProcessor.connect(silentGain);
+  silentGain.connect(microphoneContext.destination);
+}
+
+function handleVoiceEvent(message) {
+  if (typeof message.data !== 'string') return;
+  let event;
+  try { event = JSON.parse(message.data); } catch { return; }
+  if (event.type === 'response.output_audio.delta' || event.type === 'response.audio.delta') {
+    const audio = event.delta || event.audio;
+    if (audio) queuePcmAudio(audio);
+    setConversationStatus('Lulú está respondiendo…');
+  } else if (event.type === 'input_audio_buffer.speech_started') {
+    setConversationStatus('Lulú te está escuchando…');
+  } else if (event.type === 'input_audio_buffer.speech_stopped') {
+    setConversationStatus('Lulú está pensando…');
+  } else if (event.type === 'response.done') {
+    setConversationStatus('Te escucho… habla con Lulú.');
+  } else if (event.type === 'error') {
+    console.error('xAI voice error', event);
+    failVoiceConversation('Lulú tuvo un problema para escucharte. Inténtalo otra vez.');
+  }
+}
+
+function queuePcmAudio(base64Audio) {
+  if (!playbackContext) return;
+  const bytes = base64ToBytes(base64Audio);
+  const frames = Math.floor(bytes.byteLength / 2);
+  const samples = new Float32Array(frames);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, frames * 2);
+  for (let i = 0; i < frames; i += 1) samples[i] = view.getInt16(i * 2, true) / 32768;
+  const buffer = playbackContext.createBuffer(1, frames, 24000);
+  buffer.copyToChannel(samples, 0);
+  const source = playbackContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(playbackContext.destination);
+  playbackCursor = Math.max(playbackCursor, playbackContext.currentTime + 0.02);
+  source.start(playbackCursor);
+  playbackCursor += buffer.duration;
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function setConversationUi(status, buttonText) {
+  setConversationStatus(status);
+  const button = document.getElementById('conversationButton');
+  if (button) button.textContent = buttonText;
+  listenButton.classList.toggle('is-speaking', conversationState !== 'idle');
+  listenLabel.textContent = conversationState === 'idle' ? 'Hablar con Lulú' : 'Terminar';
+}
+
+function failVoiceConversation(message) {
+  endVoiceConversation(message);
+}
+
+function endVoiceConversation(message = 'Toca el botón para conversar con Lulú.') {
+  const socket = voiceSocket;
+  voiceSocket = null;
+  if (socket && socket.readyState < WebSocket.CLOSING) socket.close();
+  microphoneProcessor?.disconnect();
+  microphoneSource?.disconnect();
+  microphoneProcessor = null;
+  microphoneSource = null;
+  microphoneStream?.getTracks().forEach(track => track.stop());
+  microphoneStream = null;
+  microphoneContext?.close().catch(() => {});
+  playbackContext?.close().catch(() => {});
+  microphoneContext = null;
+  playbackContext = null;
+  playbackCursor = 0;
+  conversationState = 'idle';
+  setConversationUi(message, 'Hablar con Lulú');
 }
 
 function openImageViewer() {
