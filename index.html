@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260904-2">
+  <link rel="stylesheet" href="styles.css?v=20260904-3">
 </head>
 <body>
   <main class="reader" aria-label="Libro interactivo La Poderosa Hada Lulú">
@@ -17,10 +17,16 @@
         <p class="eyebrow">Un cuento mágico</p>
         <h1>La Poderosa Hada Lulú</h1>
       </div>
-      <button class="sound-button" id="listenButton" type="button" aria-label="Escuchar esta página">
-        <span aria-hidden="true">▶</span>
-        <span id="listenLabel">Escuchar</span>
-      </button>
+      <div class="topbar-actions">
+        <button class="cover-button" id="coverButton" type="button" aria-label="Volver a la portada">
+          <span aria-hidden="true">⌂</span>
+          <span>Portada</span>
+        </button>
+        <button class="sound-button" id="listenButton" type="button" aria-label="Escuchar esta página">
+          <span aria-hidden="true">▶</span>
+          <span id="listenLabel">Escuchar</span>
+        </button>
+      </div>
     </header>
 
     <section class="book-shell" aria-live="polite">
@@ -44,6 +50,6 @@
     <button class="viewer-close" id="viewerClose" type="button" aria-label="Cerrar imagen">×</button>
     <img id="viewerImage" src="" alt="">
   </div>
-  <script src="app.js?v=20260904-6"></script>
+  <script src="app.js?v=20260904-7"></script>
 </body>
 </html>

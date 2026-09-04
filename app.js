@@ -33,6 +33,7 @@ const pageNumber = document.getElementById('pageNumber');
 const progressBar = document.getElementById('progressBar');
 const previousButton = document.getElementById('previousButton');
 const nextButton = document.getElementById('nextButton');
+const coverButton = document.getElementById('coverButton');
 const listenButton = document.getElementById('listenButton');
 const listenLabel = document.getElementById('listenLabel');
 const imageViewer = document.getElementById('imageViewer');
@@ -82,6 +83,7 @@ function renderPage(direction = '') {
   progressBar.style.width = `${((currentPage + 1) / pages.length) * 100}%`;
   previousButton.disabled = currentPage === 0;
   nextButton.disabled = currentPage === pages.length - 1;
+  coverButton.disabled = currentPage === 0;
   sessionStorage.setItem('story-page', currentPage);
   if (direction) {
     book.classList.remove('turn-next', 'turn-previous');
@@ -96,6 +98,12 @@ function changePage(delta) {
   currentPage = target;
   renderPage(delta > 0 ? 'next' : 'previous');
   if (delta > 0) playFairyFlight();
+}
+
+function returnToCover() {
+  if (currentPage === 0) return;
+  currentPage = 0;
+  renderPage('previous');
 }
 
 function playFairyFlight() {
@@ -443,6 +451,7 @@ function closeImageViewer() {
 
 previousButton.addEventListener('click', () => changePage(-1));
 nextButton.addEventListener('click', () => changePage(1));
+coverButton.addEventListener('click', returnToCover);
 listenButton.addEventListener('click', listen);
 illustrationWrap.addEventListener('click', event => {
   if (event.target.closest('.expand-image')) openImageViewer();
