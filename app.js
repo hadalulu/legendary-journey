@@ -18,7 +18,7 @@ const pages = [
   { images: [asset('BBBC5351-F277-4144-90B8-4B03AE8D7838')], text: ['Al mismo tiempo... Lulú siguió el caminito de polvo brillante y encontró a los <strong>cuatro duendes</strong> que llevaban el saco de polvo de hada.', '—<strong>¡Ni se te ocurra usar tu magia!</strong> Si levantas tu varita, romperemos el saco y todo el polvo se perderá.', 'Lulú sonrió.', '—Muy bien... <strong>Entonces no usaré mi magia.</strong>', 'Los duendes empezaron a reír.', '—¡Je, je, je!', 'Pero Lulú le guiñó un ojo a su tigrito. El tigrito dio un saltito. <strong>¡Puf!</strong> En un abrir y cerrar de ojos se convirtió en un <strong>enorme tigre protector</strong>.'] },
   { images: [asset('17265E38-8F97-455D-8BE9-1ECBCA007E41')], text: ['—¡Rooooaaaaar!', 'Los duendes dieron un brinco del susto y salieron corriendo, dejando el saco de polvo de hada en el suelo. Lulú lo recogió y sonrió.', '—<strong>¡Lo recuperamos!</strong>'] },
   { images: [asset('6122E77E-2D77-4CCA-98B9-09248F9C21B0'), asset('90F4B904-7CA9-4468-8112-81A25E72DDDE')], text: ['Lulú voló hasta la colina donde estaban Emma y Raquel. Allí, Raquel había atrapado al gran grupo de duendes. Poco después llegaron corriendo los cuatro ladrones, y las enredaderas también los atraparon.', '—<strong>¡Lo logramos!</strong>', 'Pero Lulú se quedó pensativa.', '—Ahora que conocen el camino al castillo... ¿Qué podemos hacer para que se vayan y no vuelvan a intentar <strong>otra travesura?</strong>'] },
-  { images: [asset('1A1624A9-4AE4-4098-96DA-D378CF3E9ED7')], text: ['—Necesitamos hacer un hechizo <strong>muy poderoso.</strong> Pero solo funciona si las tres hadas... ¡y la niña Lulú!... respiran juntas. <strong>¿Nos ayudas, niña Lulú?</strong>', '<strong>Sí, ¡a ti!</strong> Estamos hablando contigo, nuestra pequeña lectora. Sin tu ayuda, el hechizo no funcionará.'] },
+  { images: [asset('1A1624A9-4AE4-4098-96DA-D378CF3E9ED7')], text: ['—Necesitamos hacer un hechizo <strong>muy poderoso.</strong> Pero solo funciona si las tres hadas... ¡y la niña Lulu!... respiran juntas. <strong>¿Nos ayudas, niña Lulu?</strong>', '<strong>Sí, ¡a ti!</strong> Estamos hablando contigo, nuestra pequeña lectora. Sin tu ayuda, el hechizo no funcionará.'] },
   { images: [asset('215C9F58-5F79-448C-AD06-22364547AA95')], text: ['Primero imaginemos que olemos una flor muy bonita. Respira hondo... Uno... dos... tres... Ahora sopla una velita. Fuuuu... Otra vez. Uno... dos... tres... Fuuuu... Y una última vez. Uno... dos... tres... Fuuuu...'] },
   { images: [asset('B92D705D-C72F-4307-9002-1D464F2184FD')], text: ['Las tres hadas apuntaron sus varitas al cielo.', '—¡Luz de luna...', '—brillo de estrella...', '—que los duendes olviden el camino al castillo y recuerden siempre el camino a su hogar!', '<strong>¡Zas!</strong>'] },
   { images: [asset('3A1A63B6-E6C9-4299-B8CD-02E5349AE34C')], text: ['Los duendes parpadearon.', '—¿Qué estábamos haciendo?', '—¡No me acuerdo!', '—¡Vamos a casa!', 'Y se fueron riendo por el bosque.'] },
@@ -231,7 +231,7 @@ async function configureVoiceSession() {
     session: {
       voice: 'eve',
       instructions: `IDENTIDAD Y FORMA DE HABLAR
-Eres el hada Lulú, protagonista de "La Poderosa Hada Lulú". La persona que habla contigo es la niña Lulú, la pequeña lectora; no la confundas contigo. Habla siempre en español mexicano, con la voz de un hada cálida, alegre y cariñosa. Usa frases breves y vocabulario apropiado para una niña pequeña. Mantente en personaje.
+Eres el hada Lulú, protagonista de "La Poderosa Hada Lulú". La persona que habla contigo es la niña Lulu, la pequeña lectora. El acento distingue sus nombres: tú eres Lulú y la lectora es Lulu. Nunca llames "Lulú" a la niña. Habla siempre en español mexicano, con la voz de un hada cálida, alegre y cariñosa. Usa frases breves y vocabulario apropiado para una niña pequeña. Mantente en personaje.
 
 CANON DEL CUENTO HASTA ESTA PÁGINA
 - Las hadas son diminutas, aproximadamente del tamaño de un dedo. Tienen alas brillantes como mariposas y viven en un bosque encantado muy lejos de las casas de los niños.
@@ -248,7 +248,7 @@ CANON DEL CUENTO HASTA ESTA PÁGINA
 - Tú seguiste el rastro brillante hasta los cuatro ladrones. Amenazaron con romper el saco si usabas la varita. Dijiste que no usarías magia y le guiñaste un ojo al tigrito. Al convertirse en un enorme tigre y rugir, los ladrones huyeron y recuperaste el saco.
 - Volviste con Emma y Raquel. Los cuatro ladrones llegaron corriendo y también quedaron atrapados por las enredaderas.
 - Las tres se preguntaron cómo impedir que los duendes regresaran ahora que conocían el camino al castillo.
-- En esta página explicas que necesitan un hechizo muy poderoso que solo funciona si las tres hadas y la niña Lulú respiran juntas. Tu meta es conversar con la niña Lulú hasta que diga que está lista para ayudar.
+- En esta página explicas que necesitan un hechizo muy poderoso que solo funciona si las tres hadas y la niña Lulu respiran juntas. Tu meta es conversar con la niña Lulu hasta que diga que está lista para ayudar.
 
 REGLAS DE FIDELIDAD
 Trata los puntos anteriores como hechos inmutables. No cambies personajes, relaciones, poderes, lugares ni acontecimientos. No inventes recuerdos o sucesos y los presentes como parte del cuento. Si te preguntan por un dato que el canon no establece, responde con honestidad, por ejemplo: "Eso todavía no lo cuenta nuestra historia". Puedes invitar a imaginar una posibilidad, pero debes presentarla claramente como un juego o una idea nueva, nunca como algo que ya ocurrió. No adelantes el desenlace. No contradigas lo que diga la niña sobre sus sentimientos; responde con empatía.
@@ -279,7 +279,7 @@ Nunca pidas ni repitas apellidos, direcciones, escuela, teléfono, ubicación, c
       interruptible: false,
       content: [{
         type: 'output_text',
-        text: 'Necesitamos hacer un hechizo muy poderoso. Pero solo funciona si las tres hadas… ¡y la niña Lulú!… respiran juntas. ¿Nos ayudas, niña Lulú?'
+        text: 'Necesitamos hacer un hechizo muy poderoso. Pero solo funciona si las tres hadas… ¡y la niña Lulu!… respiran juntas. ¿Nos ayudas, niña Lulu?'
       }]
     }
   }));
