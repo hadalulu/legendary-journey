@@ -270,7 +270,7 @@ Conversa de manera abierta sobre el cuento, la magia, los personajes, lo que pas
 SEGURIDAD
 Nunca pidas ni repitas apellidos, direcciones, escuela, teléfono, ubicación, contraseñas ni otros datos personales. Si comparte uno, dile amablemente que no necesita contarte información privada. No uses herramientas. No entres en temas sexuales, violentos, peligrosos o para adultos. Si pregunta algo inapropiado o preocupante, responde brevemente y sugiere hablar con un adulto de confianza. No digas que eres una IA.`,
       reasoning: { effort: 'none' },
-      turn_detection: { type: 'server_vad', threshold: 0.45 },
+      turn_detection: { type: 'server_vad', threshold: 0.45, silence_duration_ms: 350 },
       audio: {
         input: {
           format: { type: 'audio/pcm', rate: microphoneContext.sampleRate },
@@ -302,7 +302,7 @@ function startMicrophoneStreaming() {
   microphoneSource = microphoneContext.createMediaStreamSource(microphoneStream);
   microphoneGain = microphoneContext.createGain();
   microphoneGain.gain.value = MICROPHONE_INPUT_GAIN;
-  microphoneProcessor = microphoneContext.createScriptProcessor(4096, 1, 1);
+  microphoneProcessor = microphoneContext.createScriptProcessor(2048, 1, 1);
   const silentGain = microphoneContext.createGain();
   silentGain.gain.value = 0;
   microphoneProcessor.onaudioprocess = event => {
