@@ -42,6 +42,8 @@ const viewerClose = document.getElementById('viewerClose');
 const narrationAudio = new Audio();
 narrationAudio.preload = 'metadata';
 const PAGE_18_INDEX = 17;
+const CHATBOT_OUTPUT_GAIN = 1.65;
+const MICROPHONE_INPUT_GAIN = 1.8;
 
 let currentPage = Number(sessionStorage.getItem('story-page') || 0);
 if (currentPage < 0 || currentPage >= pages.length) currentPage = 0;
@@ -51,6 +53,7 @@ let voiceSocket = null;
 let microphoneStream = null;
 let microphoneContext = null;
 let microphoneSource = null;
+let microphoneGain = null;
 let microphoneProcessor = null;
 let playbackContext = null;
 let playbackCursor = 0;
@@ -267,7 +270,7 @@ Conversa de manera abierta sobre el cuento, la magia, los personajes, lo que pas
 SEGURIDAD
 Nunca pidas ni repitas apellidos, direcciones, escuela, teléfono, ubicación, contraseñas ni otros datos personales. Si comparte uno, dile amablemente que no necesita contarte información privada. No uses herramientas. No entres en temas sexuales, violentos, peligrosos o para adultos. Si pregunta algo inapropiado o preocupante, responde brevemente y sugiere hablar con un adulto de confianza. No digas que eres una IA.`,
       reasoning: { effort: 'none' },
-      turn_detection: { type: 'server_vad', threshold: 0.72 },
+      turn_detection: { type: 'server_vad', threshold: 0.45 },
       audio: {
         input: {
           format: { type: 'audio/pcm', rate: microphoneContext.sampleRate },
@@ -297,6 +300,8 @@ Nunca pidas ni repitas apellidos, direcciones, escuela, teléfono, ubicación, c
 
 function startMicrophoneStreaming() {
   microphoneSource = microphoneContext.createMediaStreamSource(microphoneStream);
+  microphoneGain = microphoneContext.createGain();
+  microphoneGain.gain.value = MICROPHONE_INPUT_GAIN;
   microphoneProcessor = microphoneContext.createScriptProcessor(4096, 1, 1);
   const silentGain = microphoneContext.createGain();
   silentGain.gain.value = 0;
@@ -314,7 +319,8 @@ function startMicrophoneStreaming() {
     }
     voiceSocket.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: bytesToBase64(new Uint8Array(pcm.buffer)) }));
   };
-  microphoneSource.connect(microphoneProcessor);
+  microphoneSource.connect(microphoneGain);
+  microphoneGain.connect(microphoneProcessor);
   microphoneProcessor.connect(silentGain);
   silentGain.connect(microphoneContext.destination);
 }
@@ -379,7 +385,10 @@ function queuePcmAudio(base64Audio) {
   buffer.copyToChannel(samples, 0);
   const source = playbackContext.createBufferSource();
   source.buffer = buffer;
-  source.connect(playbackContext.destination);
+  const outputGain = playbackContext.createGain();
+  outputGain.gain.value = CHATBOT_OUTPUT_GAIN;
+  source.connect(outputGain);
+  outputGain.connect(playbackContext.destination);
   playbackCursor = Math.max(playbackCursor, playbackContext.currentTime + 0.02);
   source.start(playbackCursor);
   playbackCursor += buffer.duration;
@@ -418,8 +427,10 @@ function endVoiceConversation(message = 'Usa “Iniciar conversación” arriba 
   voiceSocket = null;
   if (socket && socket.readyState < WebSocket.CLOSING) socket.close();
   microphoneProcessor?.disconnect();
+  microphoneGain?.disconnect();
   microphoneSource?.disconnect();
   microphoneProcessor = null;
+  microphoneGain = null;
   microphoneSource = null;
   microphoneStream?.getTracks().forEach(track => track.stop());
   microphoneStream = null;
